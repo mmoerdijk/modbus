@@ -94,15 +94,15 @@ class ModbusWrapperClient:
         self.__input = HoldingRegister()
         self.__input.data = [0 for i in xrange(self._num_reading_registers)]
 
-        self.__writing_registers_start = self.ADDRESS_WRITE_START
-        self.__num_writing_registers = 20
+        self._writing_registers_start = self.ADDRESS_WRITE_START
+        self._num_writing_registers = 20
         #         self.output_size = 16
-        self.__output = [None for i in range(self.__num_writing_registers)]
+        self._output = [None for i in range(self._num_writing_registers)]
 
-        self.__last_output_time = rospy.get_time()
+        self._last_output_time = rospy.get_time()
         self._mutex = Lock()
 
-        self.__sub = rospy.Subscriber(sub_topic, HoldingRegister, self.__updateModbusOutput, queue_size=500)
+        self.__sub = rospy.Subscriber(sub_topic, HoldingRegister, self.updateModbusOutput, queue_size=500)
         self.__pub = rospy.Publisher(pub_topic, HoldingRegister, queue_size=500, latch=True)
 
         rospy.on_shutdown(self.closeConnection)
@@ -141,8 +141,8 @@ class ModbusWrapperClient:
             :param num_registers: Amount of writeable registers
             :type num_registers: int
         """
-        self.__writing_registers_start = start
-        self.__num_writing_registers = num_registers
+        self._writing_registers_start = start
+        self._num_writing_registers = num_registers
 
     def getReadingRegisters(self):
         """
@@ -156,7 +156,7 @@ class ModbusWrapperClient:
             :return: Returns the first address of the writeable registers and the number of registers
             :rtype: int,int
         """
-        return self.__writing_registers_start, self.__num_writing_registers
+        return self._writing_registers_start, self._num_writing_registers
 
     def __updateModbusInput(self, delay=0):
         """                
@@ -199,22 +199,22 @@ class ModbusWrapperClient:
             rospy.Rate(self.__rate).sleep()
         self.listener_stopped = True
 
-    def __updateModbusOutput(self, msg):
+    def updateModbusOutput(self, msg):
         """
             Callback from the subscriber to update the writeable modbus registers
             :param msg: value of the new registers
             :type msg: std_msgs.Int32MultiArray
         """
         output_changed = False
-        for index in xrange(self.__num_writing_registers):
-            if self.__output[index] != msg.data[index]:
+        for index in xrange(self._num_writing_registers):
+            if self._output[index] != msg.data[index]:
                 output_changed = True
                 break
         if not output_changed:
             return
-        self.__writeRegisters(self.__writing_registers_start, msg.data)
+        self._writeRegisters(self._writing_registers_start, msg.data)
 
-    def __writeRegisters(self, address, values):
+    def _writeRegisters(self, address, values):
         """
             Writes modbus registers
             :param address: First address of the values to write
@@ -223,14 +223,14 @@ class ModbusWrapperClient:
             :type values: list
         """
         with self._mutex:
-            try:
-                if not rospy.is_shutdown():
-                    #                 print "writing address",address,"value"
-                    self.client.write_registers(address, values)
-                    self.output = values
-            except Exception, e:
-                rospy.logwarn("Could not write values %s to address %d. Exception %s", str(values), address, str(e))
-                raise e
+            # try:
+            if not rospy.is_shutdown():
+                #                 print "writing address",address,"value"
+                self.client.write_registers(address, values)
+                self.output = values
+            # except Exception, e:
+            #     rospy.logwarn("Could not write values %s to address %d. Exception %s", str(values), address, str(e))
+            #     raise e
 
     def readRegisters(self, address=None, num_registers=None):
         """
@@ -274,7 +274,7 @@ class ModbusWrapperClient:
         """
         if not type(value) is list:
             value = [int(value)]
-        self.__writeRegisters(address, value)
+        self._writeRegisters(address, value)
         if timeout > 0:
             self.post.__reset(address, timeout)
 
@@ -287,7 +287,7 @@ class ModbusWrapperClient:
             :type timeout: float
         """
         rospy.sleep(timeout)
-        self.__writeRegisters(address, [0])
+        self._writeRegisters(address, [0])
 
     def closeConnection(self):
         """
